@@ -14,7 +14,6 @@ class liftDataStore {
         this.direction = null;// up or down
         this.active = false;
         this.destinations = [];
-        this.destinyLength = 0;
         // this.doors = false;
     }
 
@@ -24,22 +23,25 @@ class liftDataStore {
     }
 
     async completeDestiny(lift) {
-        for (let i = 0; i < this.destinyLength; i++) {
+        while (this.destinatyLength()) {
             let duration = callLift(lift, this.destinations[0], this.liftPos);
             await delay(duration * 1000);
-            this.liftPos = this.destinations.shift();
+            this.liftPos = this.destinations.shift(); 
             openDoors(lift);
             await delay();
             closeDoors(lift);
             await delay();
         }
-        this.active = false
-        this.destinyLength = 0;
-        console.log(this.destinations.length)
+        this.active = false;
+        this.direction = null;
     }
 
+    destinatyLength(){
+        return this.destinations.length;
+    }
 
 }
+
 const dataStore = {};
 var liftLength = 0;
 
@@ -126,20 +128,21 @@ function chooseLift(callDirection, floorNo) {
         let liftNo = `lift_${i}`;
         let { liftPos, active, direction } = dataStore[liftNo];
         if (!active) {
+            if(liftPos==floorNo) return lift;
             return lift;
         }
         else {
-            if (!direction) {
-                return lift;
-            }
-            else {
-                if (direction == 'up' && callDirection == 'up' && liftPos < floorNo) {
+            // if (!direction) {
+            //     return lift;
+            // }
+            // else {
+                if (direction == 'Up' && callDirection == 'Up' && liftPos < floorNo) {
                     return lift;
                 }
-                if (direction == 'down' && callDirection == 'down' && liftPos > floorNo) {
+                if (direction == 'Down' && callDirection == 'Down' && liftPos > floorNo) {
                     return lift;
                 }
-            }
+            // }
         }
 
     }
@@ -190,14 +193,13 @@ function Generate() {
                 let liftStore = dataStore[`lift_${liftNo}`];
                 liftStore.direction = callDirection;
                 liftStore.addDestination(floorNo);
-                liftStore.destinyLength = liftStore.destinations.length;
                 let liftCurrentFloor = lift.getAttribute('data-current-floor');
-                if (liftCurrentFloor == floorNo && liftCurrentFloor && floorNo) {
-                    openDoors(lift);
-                    setTimeout(() => {
-                        closeDoors(lift);
-                    }, 3000);
-                }
+                if (liftCurrentFloor == floorNo ) {
+                    // openDoors(lift);
+                    // await delay();
+                    // closeDoors(lift);
+                    openAndClose(lift);
+                   }
                 else {
                     if (!liftStore.active) {
                         liftStore.completeDestiny(lift);
@@ -211,4 +213,8 @@ function Generate() {
 
 }
 
-
+async function openAndClose(lift){
+    openDoors(lift);
+    await delay();
+    closeDoors(lift);
+}
