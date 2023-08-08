@@ -5,16 +5,14 @@ const form = document.querySelector('form');
 const floorInput = document.querySelector("input[name='floors']");
 const liftInput = document.querySelector("input[name='lifts']");
 
-
-
 // -------------------------fucntions & classes---------------------------------
+
 class liftDataStore {
     constructor() {
         this.liftPos = 0;
         this.direction = null;// up or down
         this.active = false;
         this.destinations = [];
-        // this.doors = false;
     }
 
     addDestination(floorNo) {
@@ -24,26 +22,37 @@ class liftDataStore {
 
     async completeDestiny(lift) {
         while (this.destinatyLength()) {
-            let duration = callLift(lift, this.destinations[0], this.liftPos);
-            await delay(duration * 1000);
-            this.liftPos = this.destinations.shift(); 
+            if (!(this.destinations[0] === this.liftPos)) {
+                let duration = callLift(lift, this.destinations[0], this.liftPos);
+                liftPositioning(this, duration, lift);
+                await delay(duration * 1000);
+            }
             openDoors(lift);
             await delay();
             closeDoors(lift);
             await delay();
+            this.liftPos = this.destinations.shift();
         }
         this.active = false;
         this.direction = null;
     }
-
-    destinatyLength(){
-        return this.destinations.length;
-    }
-
+    
+    destinatyLength = () => this.destinations.length;
 }
 
 const dataStore = {};
 var liftLength = 0;
+
+const sortedSet = (ar) => {
+    ar.sort((a, b) => a - b);
+    let set = new Set(ar);
+    return [...set];
+}
+const randomNumber = (range = 1) => Math.floor(Math.random() * range);
+const getLiftIdNo = (lift) => parseInt(lift.getAttribute('id').slice(5));
+const getElementById = (id) => document.querySelector(`#${id}`);
+const twoNoDiff = (a, b) => Math.abs(parseInt(a) - parseInt(b));// Positive difference between two numbers
+const speed = (distance, time = 2) => distance * time; // distance * time (2sec) time in secounds
 
 function delay(miliseconds) {
     miliseconds = miliseconds || 2500;
@@ -54,15 +63,17 @@ function delay(miliseconds) {
     });
 }
 
-const sortedSet = (ar) => {
-    ar.sort((a, b) => a - b);
-    let set = new Set(ar);
-    return [...set];
+async function liftPositioning(lift, travelTime,liftElement) {
+    let count = travelTime / 2;
+    while (count) {
+        await delay(2000);
+        lift.destinations[0] < lift.liftPos && lift.liftPos--;
+        lift.destinations[0] > lift.liftPos && lift.liftPos++;
+        liftElement.setAttribute('data-current-floor', `${lift.liftPos}`);
+        count--;
+    }
 }
-const randomNumber = (range=1) => Math.floor(Math.random()*range);
-const getLiftNoFromLiftElement = (lift) => parseInt(lift.getAttribute('id').slice(5));
 
-const liftSpeed = (distance) => 2 * distance;
 function createElement(tag, classArray, textContext) {
     const element = document.createElement(tag);
     classArray?.length && element.classList.add(...classArray);
@@ -74,11 +85,11 @@ function openDoors(lift) {
     lift.children[0].children[0].classList.add("open");
     lift.children[0].children[1].classList.add("open");
 }
+
 function closeDoors(lift) {
     lift.children[0].children[0].classList.remove("open");
     lift.children[0].children[1].classList.remove("open");
 }
-
 
 function createFloorsLifts(floorCount, liftCount) {
     let floorArray = [];
@@ -94,6 +105,7 @@ function createFloorsLifts(floorCount, liftCount) {
     floors.append(...floorArray);
     lifts.append(...liftArray);
 }
+
 function createFloor(floorNo) {
     const [buttons, floor] = [createElement('div', ['buttons']), createElement('div', ['floor'])];
     const [upButton, downButton] = [createElement("button", ['up'], 'Up'), createElement("button", ['down'], 'Down')];
@@ -104,7 +116,6 @@ function createFloor(floorNo) {
     floor.setAttribute('data-floor', `${floorNo}`);
     return floor;
 }
-
 
 function createLift(liftNo) {
     const [lift, doors, leftDoor, rightDoor] = [
@@ -120,53 +131,56 @@ function createLift(liftNo) {
     return lift;
 }
 
+function nearestLift(liftLength, floorNo,callDirection) {
+    let i = 0;
+    let maxDistance = liftLength;
+    let lift = getElementById(`lift-${i}`);
+    while (i < liftLength) {
+        let liftNo = `lift_${i}`;
+        let { liftPos ,direction} = dataStore[liftNo];
+        let distance = twoNoDiff(floorNo, liftPos)
+        if(callDirection==direction || !direction){
+        if (maxDistance > distance) {
+            maxDistance = distance;
+            lift = getElementById(`lift-${i}`);
+        }}
+        i++;
+    }
+    return lift;
+}
 
 function chooseLift(callDirection, floorNo) {
     for (let i = 0; i < liftLength; i++) {
-
-        let lift = document.querySelector(`#lift-${i}`);
+        let lift = getElementById(`lift-${i}`);
         let liftNo = `lift_${i}`;
         let { liftPos, active, direction } = dataStore[liftNo];
         if (!active) {
-            if(liftPos==floorNo) return lift;
-            return lift;
+            if (liftPos == floorNo) return lift;
+            return nearestLift(liftLength, floorNo);
         }
         else {
-            // if (!direction) {
-            //     return lift;
-            // }
-            // else {
-                if (direction == 'Up' && callDirection == 'Up' && liftPos < floorNo) {
-                    return lift;
-                }
-                if (direction == 'Down' && callDirection == 'Down' && liftPos > floorNo) {
-                    return lift;
-                }
-            // }
+            if(callDirection==direction){
+            if (callDirection == 'Up') {
+                if(liftPos < floorNo) return nearestLift(liftLength,floorNo,callDirection);
+            }
+            else {
+                if(liftPos > floorNo) return nearestLift(liftLength,floorNo,callDirection);
+            }}
         }
-
     }
-
-    return document.querySelector(`#lift-${randomNumber(liftLength)}`);//if no lift selected  (bug)
+ // return document.querySelector(`#lift-${randomNumber(liftLength)}`);//if no lift selected  (bug)
 }
-
 
 function callLift(lift, floorNo, liftPos) {
     const liftHeight = lift.offsetHeight;
-    const duration = Math.abs(liftSpeed(floorNo - liftPos));
+    const duration = speed(twoNoDiff(floorNo, liftPos));
     lift.style.transition = `transform ${duration}s linear`;
     lift.style.transform = `translateY(-${liftHeight * floorNo}px)`;
-    lift.setAttribute('data-current-floor', `${floorNo}`);
 
     return duration;
 }
 
-
-
-
 // ---------------------exexutions-----------------------------------------
-
-
 
 form.addEventListener("submit", function (e) {
     e.preventDefault();
@@ -177,10 +191,7 @@ form.addEventListener("submit", function (e) {
 });
 
 function Generate() {
-    var up = document.querySelectorAll('.up');
-    var down = document.querySelectorAll('.down');
     var floorButtons = document.querySelectorAll(".floor .buttons");
-
 
     floorButtons.forEach((element) => {
         let floorNo = element.parentElement.getAttribute("data-floor");
@@ -189,32 +200,18 @@ function Generate() {
             elem.addEventListener('click', function () {
                 let callDirection = elem.textContent;
                 let lift = chooseLift(callDirection, floorNo);
-                let liftNo = getLiftNoFromLiftElement(lift);
+                let liftNo = getLiftIdNo(lift);
                 let liftStore = dataStore[`lift_${liftNo}`];
-                liftStore.direction = callDirection;
+                liftStore.direction =  !liftStore.direction? callDirection : liftStore.direction;
+                console.log(liftStore.direction);
                 liftStore.addDestination(floorNo);
-                let liftCurrentFloor = lift.getAttribute('data-current-floor');
-                if (liftCurrentFloor == floorNo ) {
-                    // openDoors(lift);
-                    // await delay();
-                    // closeDoors(lift);
-                    openAndClose(lift);
-                   }
-                else {
-                    if (!liftStore.active) {
-                        liftStore.completeDestiny(lift);
-                        liftStore.active = true;
-                    }
+                if (!liftStore.active) {
+                    liftStore.completeDestiny(lift);
+                    liftStore.active = true;
                 }
             })
         })
 
     })
 
-}
-
-async function openAndClose(lift){
-    openDoors(lift);
-    await delay();
-    closeDoors(lift);
 }
